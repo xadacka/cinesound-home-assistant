@@ -7,11 +7,15 @@
       },
       "user": {
         "title": "Set up Cinesound Sofa",
+        "description": "Make sure the sofa is powered on and the phone app is closed.",
         "data": {
-          "address": "Bluetooth address",
-          "name": "Name"
+          "discovered_device": "Sofa",
+          "address": "Bluetooth address (manual fallback)"
         }
       }
+    },
+    "error": {
+      "no_devices_found": "No Cinesound sofa found nearby. Make sure it is powered on and the phone app is fully closed, then try again."
     },
     "abort": {
       "already_configured": "This sofa is already configured."
