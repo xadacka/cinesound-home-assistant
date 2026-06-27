@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "bluetooth_confirm": {
+        "title": "Cinesound Sofa Found",
+        "description": "Set up **{name}**?"
+      },
+      "user": {
+        "title": "Set up Cinesound Sofa",
+        "data": {
+          "address": "Bluetooth address",
+          "name": "Name"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This sofa is already configured."
+    }
+  }
+}

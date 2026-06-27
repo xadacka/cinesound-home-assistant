@@ -1,0 +1,9 @@
+apk/
+decompiled/
+captures/
+*.apk
+*.xapk
+*.apks
+__pycache__/
+.venv/
+.DS_Store
