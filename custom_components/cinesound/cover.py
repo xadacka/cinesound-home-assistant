@@ -82,7 +82,7 @@ COVERS: tuple[CinesoundCoverDescription, ...] = (
     CinesoundCoverDescription(
         key="storage",
         name="Storage Compartment",
-        device_class=CoverDeviceClass.LID,
+        device_class=CoverDeviceClass.DOOR,
         open_code=P.CMD["cup_motor_up"],
         close_code=P.CMD["cup_motor_down"],
         pid=P.PID_CTRL,
