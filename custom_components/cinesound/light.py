@@ -1,12 +1,11 @@
-"""Light entity for the sofa's LED strip."""
+"""Light entity for the sofa's LED strip (full RGB + brightness)."""
 from __future__ import annotations
 
 from homeassistant.components.light import (
-    ATTR_EFFECT,
-    ATTR_HS_COLOR,
+    ATTR_BRIGHTNESS,
+    ATTR_RGB_COLOR,
     ColorMode,
     LightEntity,
-    LightEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -17,38 +16,16 @@ from .const import DOMAIN
 from .coordinator import CinesoundCoordinator
 from . import sofa_protocol as P
 
-# Named effects (modes + special)
-EFFECTS: dict[str, int] = {
-    "Rainbow": P.CMD["led_rgbv"],
-    "Breathing": P.CMD["led_breath"],
-    "Mode 1": P.CMD["led_m1"],
-    "Mode 2": P.CMD["led_m2"],
-    "Mode 3": P.CMD["led_m3"],
-    "Mode 4": P.CMD["led_m4"],
-    "Mode 5": P.CMD["led_m5"],
-    "Mode 6": P.CMD["led_m6"],
-}
 
-# Hue (°) → LED preset command.  Saturation < 25 → white.
-_HUE_MAP = [
-    (0,   P.CMD["led_r"]),   # red
-    (60,  P.CMD["led_rg"]),  # yellow
-    (120, P.CMD["led_g"]),   # green
-    (180, P.CMD["led_gb"]),  # cyan
-    (240, P.CMD["led_b"]),   # blue
-    (300, P.CMD["led_rb"]),  # magenta
-]
+def _rgbv_param(rgb: tuple[int, int, int], brightness: int) -> int:
+    """Pack colour + brightness into the led_rgbv parameter.
 
-
-def _hs_to_cmd(hs: tuple[float, float]) -> int:
-    """Quantize an HS color to the nearest sofa LED preset."""
-    hue, sat = hs
-    if sat < 25:
-        return P.CMD["led_white"]
-    return min(
-        _HUE_MAP,
-        key=lambda hp: min(abs(hp[0] - hue), 360 - abs(hp[0] - hue)),
-    )[1]
+    Encoding reverse-engineered from the app's NewRGBActivity:
+        dp = (0xRRGGBB << 8) | (brightness & 0xFF)   ->   0xRRGGBBVV
+    The low byte is the brightness/value (0-255); a value of 0 = off.
+    """
+    r, g, b = rgb
+    return ((r & 0xFF) << 24) | ((g & 0xFF) << 16) | ((b & 0xFF) << 8) | (brightness & 0xFF)
 
 
 async def async_setup_entry(
@@ -63,16 +40,16 @@ async def async_setup_entry(
 class CinesoundLight(LightEntity):
     """LED ambient lighting on the sofa.
 
-    HS color wheel in HA is quantized to the sofa's 6 solid presets plus white.
-    Effects cover Rainbow, Breathing, and Mode 1–6.
+    Full RGB colour wheel plus brightness, both carried in the led_rgbv
+    parameter (0xRRGGBBVV). The hardware's preset/effect commands
+    (solid colours, breathing, modes) do nothing on this unit, so they
+    are not exposed.
     """
 
     _attr_name = "LED"
     _attr_has_entity_name = True
-    _attr_color_mode = ColorMode.HS
-    _attr_supported_color_modes = {ColorMode.HS}
-    _attr_supported_features = LightEntityFeature.EFFECT
-    _attr_effect_list = list(EFFECTS)
+    _attr_color_mode = ColorMode.RGB
+    _attr_supported_color_modes = {ColorMode.RGB}
     _attr_icon = "mdi:led-strip-variant"
 
     def __init__(self, coordinator: CinesoundCoordinator) -> None:
@@ -85,30 +62,18 @@ class CinesoundLight(LightEntity):
             model="Aventra Cinesound",
         )
         self._attr_is_on = False
-        self._attr_hs_color: tuple[float, float] = (0, 0)  # white default
-        self._attr_effect: str | None = None
+        self._attr_rgb_color: tuple[int, int, int] = (255, 255, 255)
+        self._attr_brightness = 255
 
     async def async_turn_on(self, **kwargs) -> None:
-        effect = kwargs.get(ATTR_EFFECT)
-        hs = kwargs.get(ATTR_HS_COLOR)
+        if ATTR_RGB_COLOR in kwargs:
+            self._attr_rgb_color = kwargs[ATTR_RGB_COLOR]
+        if ATTR_BRIGHTNESS in kwargs:
+            self._attr_brightness = kwargs[ATTR_BRIGHTNESS]
 
-        if effect:
-            code = EFFECTS[effect]
-            self._attr_effect = effect
-            self._attr_hs_color = (0, 0)
-        elif hs:
-            code = _hs_to_cmd(hs)
-            self._attr_hs_color = hs
-            self._attr_effect = None
-        else:
-            # plain turn_on with no kwargs; restore last state
-            code = (
-                EFFECTS[self._attr_effect]
-                if self._attr_effect
-                else _hs_to_cmd(self._attr_hs_color)
-            )
-
-        await self._coordinator.async_send(code)
+        brightness = self._attr_brightness or 255
+        param = _rgbv_param(self._attr_rgb_color, brightness)
+        await self._coordinator.async_send(P.CMD["led_rgbv"], param)
         self._attr_is_on = True
         self.async_write_ha_state()
 

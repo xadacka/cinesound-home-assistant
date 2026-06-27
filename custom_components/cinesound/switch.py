@@ -18,22 +18,44 @@ from . import sofa_protocol as P
 class CinesoundSwitchDescription(SwitchEntityDescription):
     on_code: int
     off_code: int
+    pid: int = P.PID_CTRL
     icon: str = "mdi:toggle-switch"
 
 
 SWITCHES: tuple[CinesoundSwitchDescription, ...] = (
+    # Cup chillers: same codes, left vs right selected by PID.
     CinesoundSwitchDescription(
-        key="chiller",
-        name="Cup Chiller",
+        key="chiller_left",
+        name="Left Cup Chiller",
         on_code=P.CMD["cup_cool_on"],
         off_code=P.CMD["cup_cool_off"],
+        pid=P.PID_CTRL,
         icon="mdi:cup-water",
     ),
     CinesoundSwitchDescription(
-        key="vibration",
-        name="Music Vibration",
+        key="chiller_right",
+        name="Right Cup Chiller",
+        on_code=P.CMD["cup_cool_on"],
+        off_code=P.CMD["cup_cool_off"],
+        pid=P.PID_CTRL_RIGHT,
+        icon="mdi:cup-water",
+    ),
+    # Music-sync vibration: left = massage1, right = massage2 (both PID=1).
+    # Only audible/visible while audio is playing.
+    CinesoundSwitchDescription(
+        key="vibration_left",
+        name="Left Music Vibration",
         on_code=P.CMD["audio_massage1_start"],
         off_code=P.CMD["audio_massage1_stop"],
+        pid=P.PID_CTRL,
+        icon="mdi:vibrate",
+    ),
+    CinesoundSwitchDescription(
+        key="vibration_right",
+        name="Right Music Vibration",
+        on_code=P.CMD["audio_massage2_start"],
+        off_code=P.CMD["audio_massage2_stop"],
+        pid=P.PID_CTRL,
         icon="mdi:vibrate",
     ),
 )
@@ -72,11 +94,13 @@ class CinesoundSwitch(SwitchEntity):
         return self.entity_description.icon
 
     async def async_turn_on(self, **kwargs) -> None:
-        await self._coordinator.async_send(self.entity_description.on_code)
+        desc = self.entity_description
+        await self._coordinator.async_send(desc.on_code, pid=desc.pid)
         self._attr_is_on = True
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
-        await self._coordinator.async_send(self.entity_description.off_code)
+        desc = self.entity_description
+        await self._coordinator.async_send(desc.off_code, pid=desc.pid)
         self._attr_is_on = False
         self.async_write_ha_state()

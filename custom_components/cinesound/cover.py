@@ -112,6 +112,10 @@ class CinesoundCover(CoverEntity):
         CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE | CoverEntityFeature.STOP
     )
     _attr_has_entity_name = True
+    # No position feedback from the hardware: report assumed state so HA keeps
+    # the open/close/stop buttons always enabled instead of disabling whichever
+    # direction it thinks the cover has already reached.
+    _attr_assumed_state = True
     _attr_is_closed: bool | None = None  # unknown until first move
 
     def __init__(
@@ -144,6 +148,7 @@ class CinesoundCover(CoverEntity):
         self.async_write_ha_state()
 
     async def async_stop_cover(self, **kwargs) -> None:
-        await self._coordinator.async_motor_stop(self.entity_description.key)
+        desc: CinesoundCoverDescription = self.entity_description
+        await self._coordinator.async_motor_stop(desc.key, desc.pid)
         self._attr_is_closed = None
         self.async_write_ha_state()

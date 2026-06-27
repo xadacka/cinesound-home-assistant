@@ -52,8 +52,12 @@ CMD: dict[str, int] = {
     "cup_motor_up": 24728, "cup_motor_down": 24729,
     # cup chiller (624/625 confirmed on ECBLE583)
     "cup_cool_on": 624, "cup_cool_off": 625,
-    # music-sync vibration (4114/4115 confirmed; _all_ variants 4112/4113 unresponsive)
+    # music-sync vibration. massage1_* = left seat, massage2_* = right seat
+    # (both on PID=1; the seat is selected by the code, not the PID).
     "audio_massage1_stop": 4114, "audio_massage1_start": 4115,
+    "audio_massage1_1": 4116, "audio_massage1_2": 4117, "audio_massage1_3": 4118,
+    "audio_massage2_stop": 4119, "audio_massage2_start": 4120,
+    "audio_massage2_1": 4121, "audio_massage2_2": 4122, "audio_massage2_3": 4123,
     # lock
     "lock_on": 24737, "lock_off": 24738, "lock_toggle": 24739,
 }

@@ -33,6 +33,9 @@ class CinesoundCoordinator:
         self._write_lock = asyncio.Lock()
         # Per-motor safety timeout handles keyed by motor_key string.
         self._motor_timeouts: dict[str, asyncio.TimerHandle] = {}
+        # Remember which PID (side) each motor was started on, so the stop
+        # command can be addressed to the correct side.
+        self._motor_pids: dict[str, int] = {}
         self._serial = 0
 
     def _next_serial(self) -> int:
@@ -54,7 +57,8 @@ class CinesoundCoordinator:
         self._motor_timeouts.clear()
         if self._client and self._client.is_connected:
             try:
-                await self._raw_write(P.CMD["stop_motor"])
+                await self._raw_write(P.CMD["stop_motor"], pid=P.PID_CTRL)
+                await self._raw_write(P.CMD["stop_motor"], pid=P.PID_CTRL_RIGHT)
                 await self._client.disconnect()
             except Exception:  # noqa: BLE001
                 pass
@@ -145,27 +149,38 @@ class CinesoundCoordinator:
     ) -> None:
         """Send one move command and arm a safety-stop timer."""
         self._cancel_motor_timeout(motor_key)
+        self._motor_pids[motor_key] = pid
         await self.async_send(move_code, pid=pid)
 
         loop = asyncio.get_event_loop()
 
         def _safety_stop() -> None:
             _LOGGER.debug("Safety timeout for motor %s, sending stop", motor_key)
-            asyncio.ensure_future(self.async_send(P.CMD["stop_motor"]))
+            # Stop must target the same side (PID) the motor was started on.
+            asyncio.ensure_future(self.async_send(P.CMD["stop_motor"], pid=pid))
             self._motor_timeouts.pop(motor_key, None)
 
         self._motor_timeouts[motor_key] = loop.call_later(
             MOTOR_SAFETY_TIMEOUT, _safety_stop
         )
 
-    async def async_motor_stop(self, motor_key: str | None = None) -> None:
-        """Cancel timeout and send stop immediately."""
+    async def async_motor_stop(
+        self, motor_key: str | None = None, pid: int | None = None
+    ) -> None:
+        """Cancel timeout and send stop immediately to the correct side."""
         if motor_key:
             self._cancel_motor_timeout(motor_key)
+            send_pid = (
+                pid if pid is not None
+                else self._motor_pids.get(motor_key, P.PID_CTRL)
+            )
+            await self.async_send(P.CMD["stop_motor"], pid=send_pid)
         else:
             for k in list(self._motor_timeouts):
                 self._cancel_motor_timeout(k)
-        await self.async_send(P.CMD["stop_motor"])
+            # No specific motor: stop both sides to be safe.
+            await self.async_send(P.CMD["stop_motor"], pid=P.PID_CTRL)
+            await self.async_send(P.CMD["stop_motor"], pid=P.PID_CTRL_RIGHT)
 
     def _cancel_motor_timeout(self, motor_key: str) -> None:
         handle = self._motor_timeouts.pop(motor_key, None)
