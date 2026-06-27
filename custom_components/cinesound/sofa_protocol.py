@@ -52,6 +52,8 @@ CMD: dict[str, int] = {
     "cup_motor_up": 24728, "cup_motor_down": 24729,
     # cup chiller (624/625 confirmed on ECBLE583)
     "cup_cool_on": 624, "cup_cool_off": 625,
+    # music-sync vibration (4114/4115 confirmed; _all_ variants 4112/4113 unresponsive)
+    "audio_massage1_stop": 4114, "audio_massage1_start": 4115,
     # lock
     "lock_on": 24737, "lock_off": 24738, "lock_toggle": 24739,
 }

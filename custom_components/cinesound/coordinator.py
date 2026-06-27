@@ -78,11 +78,26 @@ class CinesoundCoordinator:
                 )
                 return False
             try:
-                self._client = BleakClient(
+                client = BleakClient(
                     ble_device, disconnected_callback=self._on_disconnect
                 )
-                await self._client.connect()
-                await self._client.start_notify(NOTIFY_UUID, self._on_notify)
+                await client.connect()
+                # Status notifications are only used for debug logging; failing to
+                # subscribe must not prevent command writes. Keep it non-fatal.
+                try:
+                    await client.start_notify(NOTIFY_UUID, self._on_notify)
+                except (BleakError, asyncio.TimeoutError, EOFError) as err:
+                    _LOGGER.debug(
+                        "Notify setup on %s failed (status feedback disabled): %s",
+                        self.address, err,
+                    )
+                # Only commit the client if the link is genuinely still up. The
+                # sofa sometimes drops immediately after connect (e.g. phone app
+                # still holding the single allowed BLE connection).
+                if not client.is_connected:
+                    self._client = None
+                    return False
+                self._client = client
                 _LOGGER.info("Connected to %s (%s)", self.name, self.address)
                 return True
             except (BleakError, asyncio.TimeoutError) as err:
